@@ -1,0 +1,29 @@
+#
+# Core dependencies for PSyGenTAB evaluation and notebooks.
+# Tested with Python 3.9–3.11.
+#
+
+numpy
+pandas
+scipy
+scikit-learn
+imbalanced-learn
+matplotlib
+seaborn
+torch
+
+# Evaluation utilities
+sdmetrics
+sdv
+mostlyai
+
+# Plotting / logging helpers
+python-dateutil
+
+# Notebook usage
+jupyter
+notebook
+
+# Optional: hyperparameter tuning (used in some experiments)
+optuna
+

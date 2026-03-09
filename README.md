@@ -26,9 +26,24 @@ The framework formulates synthetic data generation as a **constrained optimizati
 
 ```
 .
-├── RTF_ALM.ipynb              # REaLTabFormer + ALM implementation
-├── CTAB GAN+ ALM.ipynb        # CTAB-GAN+ + ALM implementation
-└── README.md
+├── README.md
+├── RTF+ALM.ipynb                    # REaLTabFormer + ALM (training + generation)
+├── CTAB GAN+ ALM.ipynb              # CTAB-GAN+ + ALM (training + generation)
+├── eval/                            # Evaluation scripts (privacy, utility, fidelity)
+│   ├── evaluate_all.py              # Main entrypoint to reproduce paper evaluations
+│   ├── commercial_tools_scores.py   # Evaluation of commercial synthetic data tools
+│   ├── statistical_fidelity_analysis.py
+│   ├── ml_utility_evaluation.py
+│   └── adverserial_attacks.py
+└── data/
+    └── CTAB-GAN-Plus-outputs/       # Example synthetic outputs from CTAB-GAN+ (CSV)
+```
+
+The evaluation scripts expect an `ALM_Paper/` folder under `eval/` containing the **original** and **synthetic** CSVs for all datasets used in the paper (e.g. `diabetes_health_indicators_original.csv`, `*_synthetic_alm.csv`, `*_synthetic_rtf.csv`, etc.).
+If you are a reviewer, this folder is provided as part of the **supplementary material / data archive**; after downloading it, place it at:
+
+```
+PsyGenTAB/eval/ALM_Paper/
 ```
 
 ---
@@ -66,35 +81,108 @@ Experiments were conducted on:
 
 ---
 
-## ⚙️ Installation
+## ⚙️ Environment Setup
 
-### Requirements
+**Recommended Python version:** 3.9–3.11
 
-* Python 3.9+
-* PyTorch
-* NumPy
-* Pandas
-* Scikit-learn
-* Matplotlib
-* Optuna (for hyperparameter tuning)
+All core dependencies for the evaluation scripts and notebooks are listed in `requirements.txt`.
+
+1. **Create and activate a virtual environment**
+   - On macOS / Linux:
+     ```bash
+     python3 -m venv .venv
+     source .venv/bin/activate
+     ```
+   - On Windows (PowerShell):
+     ```powershell
+     python -m venv .venv
+     .venv\Scripts\Activate.ps1
+     ```
+
+2. **Install dependencies**
+   ```bash
+   pip install --upgrade pip
+   pip install -r requirements.txt
+   ```
+
+3. (Optional, for GPU) Install a CUDA-enabled build of PyTorch following the instructions from the official PyTorch documentation.
 
 
+## ▶️ Reproducing Evaluation Results (Command Line)
 
-## ▶️ Running Experiments
+The main entrypoint to reproduce the paper’s evaluation tables and figures is `eval/evaluate_all.py`.
 
-1. Open the desired notebook:
+From the repository root:
 
-   * `RTF_ALM.ipynb`
-   * `CTAB GAN+ ALM.ipynb`
+```bash
+cd PsyGenTAB
+python -m venv .venv
+source .venv/bin/activate          # or .venv\Scripts\Activate.ps1 on Windows
+pip install -r requirements.txt
 
-2. Run:
+# Ensure ALM_Paper/ with original + synthetic CSVs is present:
+# PsyGenTAB/eval/ALM_Paper/...
 
-   * Baseline model training
-   * Synthetic data generation
-   * Privacy & utility evaluation
-   * ALM outer-loop optimization
+python eval/evaluate_all.py
+```
 
-Each notebook is self-contained and reproduces the results reported in the paper.
+By default, this:
+
+- Evaluates **11 datasets** (e.g. `diabetes_health_indicators`, `adult_census_income`, `breast_cancer`, `vn_banking`, `lung_cancer`, `obesity`, `hypothyroid`, `liver_disorders`, `heart_failure_clinical_records`, `pir_vision_office`).
+- Compares **ALM** vs **RTF** synthetic data.
+- Writes per-dataset JSON reports and an aggregated `evaluation_summary.json` under:
+
+```
+eval/ALM_Paper/evaluation_reports/
+```
+
+### Optional components and external tools
+
+Some evaluation components depend on external libraries that may be slow or licensed differently:
+
+- **SDMetrics reports** (via `sdmetrics` / `sdv`)
+- **MostlyAI QA reports** (via `mostlyai`)
+- **Privacy attack framework** (via `privacy_evaluation_framework`, if available)
+
+You can:
+
+- **Disable specific components**:
+  ```bash
+  python eval/evaluate_all.py --skip-components privacy_attacks sdmetrics mostlyai_qa
+  ```
+- **Run only a subset of datasets**:
+  ```bash
+  python eval/evaluate_all.py --datasets diabetes_health_indicators adult_census_income
+  ```
+
+
+## ▶️ Running Experiments from Notebooks
+
+The two main notebooks are:
+
+- `RTF+ALM.ipynb`
+- `CTAB GAN+ ALM.ipynb`
+
+Each notebook:
+
+- Trains the underlying generator (REaLTabFormer or CTAB-GAN+).
+- Generates synthetic datasets at different privacy–utility operating points.
+- Saves synthetic CSVs expected by the evaluation scripts.
+
+These notebooks may require **additional, model-specific dependencies** (e.g. REaLTabFormer and CTAB-GAN+ packages).
+We recommend using the same virtual environment as above, and installing any extra packages indicated at the top of each notebook.
+
+To run a notebook:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install jupyter
+jupyter notebook
+```
+
+Then open the desired notebook and execute all cells.
 
 ---
 
