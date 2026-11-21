@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PSyGenTAB · Privacy-Constrained Synthetic Health Data at Sampling Time</title>
+<meta name="description" content="PSyGenTAB releases the most useful synthetic health dataset that meets a custodian-set privacy floor, for any tabular generator, via an augmented-Lagrangian selection at sampling time.">
+<meta property="og:title" content="PSyGenTAB · Privacy-Constrained Synthetic Health Data">
+<meta property="og:description" content="Set a privacy floor; release the most useful synthetic cohort that meets it — for any generator.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --grad:linear-gradient(120deg,#22c1a3 0%,#3987e5 50%,#8b5cf6 100%);
+  --radius:16px;--maxw:1120px;
+}
+html[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0b111b;--bg2:#0f1724;--card:#131b28;--card2:#182233;--line:#25324a;
+  --ink:#eef3fb;--mut:#a3b3c9;--faint:#6f809a;--accent:#2fd0b0;--accent2:#7aa8ff;
+  /* chart tokens: dark steps, validated against --card (#131b28) */
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--ref:#7d8aa0;--grid:#223049;--surface:#131b28;
+  --div-neg:#1c5cab;--div-mid:#2a3446;--div-pos:#e66767;
+}
+html[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f6f8fc;--bg2:#eef2f8;--card:#ffffff;--card2:#f7f9fc;--line:#e1e7f0;
+  --ink:#0f1a2b;--mut:#4a586d;--faint:#8592a6;--accent:#0f9d84;--accent2:#2a78d6;
+  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--ref:#8c8b86;--grid:#e9edf3;--surface:#ffffff;
+  --div-neg:#1c5cab;--div-mid:#f0efec;--div-pos:#e34948;
+}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  line-height:1.62;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+h1,h2,h3{font-family:"Space Grotesk",Inter,sans-serif;line-height:1.15;letter-spacing:-.01em}
+h2{font-size:clamp(1.5rem,3vw,2.1rem);margin:0 0 10px}h3{font-size:1.12rem;margin:0 0 6px}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 22px}
+section{padding:72px 0;border-top:1px solid var(--line)}
+.eyebrow{font-family:"JetBrains Mono",monospace;font-size:.74rem;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+.lead{color:var(--mut);max-width:72ch;font-size:1.04rem;margin:0 0 26px}
+.muted{color:var(--mut)}.faint{color:var(--faint)}
+/* verdict + heatmap */
+.verdict h3.col{display:flex;align-items:center;gap:9px;margin:0 0 12px;font-size:1.15rem}
+.verdict h3.col i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.vcard{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--c);border-radius:var(--radius);padding:15px 17px;margin-bottom:12px}
+.vcard h4{margin:0 0 5px;font-size:1rem}.vcard .big{font-family:"Space Grotesk";font-weight:700;font-size:1.25rem;color:var(--c)}
+.vcard p{margin:.25em 0 0;color:var(--mut);font-size:.92rem}.vcard .why{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:.88rem}
+.vcard .why b{color:var(--ink)}
+.hm text{font-size:11px;fill:var(--mut)}.hm .cell{cursor:pointer}.hm .sel{stroke:var(--ink);stroke-width:2}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px}.chips button{background:var(--card2);border:1px solid var(--line);color:var(--mut);border-radius:999px;padding:4px 11px;font-size:.82rem;cursor:pointer}
+.chips button.on{background:var(--accent);color:#06121a;border-color:var(--accent)}
+/* nav */
+nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(12px);background:color-mix(in srgb,var(--bg) 80%,transparent);border-bottom:1px solid var(--line)}
+.nav-in{max-width:var(--maxw);margin:0 auto;padding:11px 22px;display:flex;align-items:center;gap:18px}
+.brand{font-family:"Space Grotesk";font-weight:700;font-size:1.06rem;display:flex;align-items:center;gap:9px;color:var(--ink)}
+.brand b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.nav-links{display:flex;gap:18px;margin-left:auto;flex-wrap:wrap}
+.nav-links a{color:var(--mut);font-size:.86rem;font-weight:500}.nav-links a:hover{color:var(--ink);text-decoration:none}
+.tgl{background:none;border:1px solid var(--line);color:var(--mut);border-radius:9px;height:30px;padding:0 10px;cursor:pointer;font:inherit;font-size:.82rem}
+@media(max-width:860px){.nav-links{display:none}}
+/* hero */
+.hero{position:relative;overflow:hidden;text-align:center;padding:82px 0 64px;border-top:none}
+.hero::before{content:"";position:absolute;inset:-35% -10% auto;height:640px;pointer-events:none;z-index:0;filter:blur(8px);
+  background:radial-gradient(55% 55% at 25% 25%,rgba(34,193,163,.20),transparent 70%),radial-gradient(50% 50% at 75% 15%,rgba(57,135,229,.20),transparent 70%),radial-gradient(45% 45% at 60% 65%,rgba(139,92,246,.15),transparent 70%)}
+.hero>*{position:relative;z-index:1}
+.venue{display:inline-block;font-family:"JetBrains Mono",monospace;font-size:.72rem;letter-spacing:.14em;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:5px 14px;margin-bottom:22px}
+.hero h1{font-size:clamp(2rem,4.6vw,3.3rem);margin:.1em auto .2em;max-width:20ch;font-weight:700}
+.hero h1 .name{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tagline{color:var(--mut);max-width:62ch;margin:14px auto 0;font-size:1.08rem}
+.authors{margin:26px auto 4px;max-width:78ch;font-size:1rem}.authors span{white-space:nowrap;margin:0 6px}
+.authors sup{color:var(--accent);font-weight:600}
+.affil{color:var(--faint);font-size:.84rem;max-width:80ch;margin:10px auto 0}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:28px}
+.btn{display:inline-flex;align-items:center;gap:9px;padding:11px 19px;border-radius:12px;font-weight:600;font-size:.93rem;border:1px solid var(--line);color:var(--ink);background:var(--card);transition:transform .15s,border-color .15s}
+.btn:hover{transform:translateY(-2px);border-color:var(--accent);text-decoration:none}
+.btn.primary{background:var(--grad);color:#06121a;border:none}.btn svg{width:17px;height:17px}
+.btn.soon{opacity:.6;cursor:default}.btn.soon:hover{transform:none;border-color:var(--line)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:40px auto 0;max-width:980px;text-align:left}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.tile .k{font-size:.78rem;color:var(--mut)}.tile .v{font-family:"Space Grotesk";font-size:1.75rem;font-weight:700;margin-top:2px}
+.tile .d{font-size:.78rem;color:var(--faint)}
+.banner{max-width:980px;margin:22px auto 0;font-size:.86rem;color:var(--mut);background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:10px 14px;text-align:left}
+.banner .bar{height:6px;background:var(--grid);border-radius:4px;overflow:hidden;margin-top:7px}.banner .bar i{display:block;height:100%;background:var(--grad)}
+/* cards / grids */
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.card p{margin:.3em 0 0;color:var(--mut);font-size:.95rem}
+.card .ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--card2);border:1px solid var(--line);margin-bottom:10px;font-size:1.1rem}
+.abstract p{font-size:1.04rem;color:var(--mut);max-width:80ch}
+/* chart frame */
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;position:relative}
+.filters{display:flex;flex-wrap:wrap;gap:14px;align-items:end;margin:0 0 12px}
+.filters label{display:flex;flex-direction:column;font-size:.76rem;color:var(--mut);gap:5px;font-weight:500}
+select{font:inherit;font-size:.88rem;color:var(--ink);background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:6px 9px}
+svg text{fill:var(--mut);font-size:11px;font-family:Inter,sans-serif}svg .axis-title{fill:var(--ink);font-size:12px}
+.legend{display:flex;flex-wrap:wrap;gap:16px;font-size:.8rem;color:var(--mut);margin:8px 4px 0}.legend span{display:inline-flex;align-items:center;gap:6px}
+.tip{position:fixed;pointer-events:none;background:var(--card2);border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:.8rem;box-shadow:0 8px 24px rgba(0,0,0,.25);display:none;z-index:100;max-width:320px;color:var(--ink)}
+.tip .r{color:var(--mut)}
+/* dial */
+.dial{display:grid;grid-template-columns:1.35fr 1fr;gap:18px;align-items:stretch}
+@media(max-width:900px){.dial{grid-template-columns:1fr}}
+.knob{display:flex;align-items:center;gap:14px;margin:6px 0 4px}
+.knob input[type=range]{flex:1;accent-color:var(--accent);height:28px}
+.knob .val{font-family:"JetBrains Mono";font-size:1.5rem;font-weight:600;min-width:4.2ch;color:var(--ink)}
+.readout{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.readout>div{background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+.readout .k{font-size:.74rem;color:var(--mut)}.readout .v{font-family:"Space Grotesk";font-size:1.32rem;font-weight:700}
+.readout .d{font-size:.72rem;color:var(--faint)}
+.note{font-size:.8rem;color:var(--faint);margin-top:10px}
+/* method */
+.pipe{width:100%;height:auto;display:block}
+.pipe .flow{stroke-dasharray:6 8;animation:flow 1.4s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-28}}
+@media (prefers-reduced-motion:reduce){.pipe .flow{animation:none}}
+.eq{font-family:"JetBrains Mono",monospace;font-size:.92rem;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--ink);overflow-x:auto;white-space:nowrap;margin:8px 0}
+.eq i{font-family:Georgia,serif;font-style:italic}
+.steps{counter-reset:s;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:22px}
+.steps .card h3::before{counter-increment:s;content:counter(s);display:inline-grid;place-items:center;width:24px;height:24px;border-radius:7px;background:var(--grad);color:#06121a;font-size:.8rem;margin-right:9px}
+/* tables */
+.tablebox{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.84rem}
+th,td{padding:7px 10px;border-bottom:1px solid var(--grid);text-align:right;white-space:nowrap}
+th{cursor:pointer;color:var(--mut);font-weight:600;position:sticky;top:0;background:var(--card);z-index:1}
+td:first-child,th:first-child{text-align:left}tr.ours td:first-child{font-weight:650}
+tr.ours td:first-child::before{content:"◆ ";color:var(--s1)}
+.sig{font-family:"JetBrains Mono";font-size:.78rem}
+.pill{display:inline-block;font-size:.72rem;padding:1px 8px;border-radius:999px;border:1px solid var(--line);color:var(--mut)}
+/* gallery */
+.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.gallery figure{margin:0;background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px;cursor:zoom-in;transition:transform .15s}
+.gallery figure:hover{transform:translateY(-2px)}.gallery img{width:100%;display:block}
+.gallery figcaption{font-size:.8rem;color:#4a586d;margin-top:6px}
+.lightbox{position:fixed;inset:0;background:rgba(5,9,16,.86);display:none;align-items:center;justify-content:center;z-index:200;padding:24px;cursor:zoom-out}
+.lightbox img{max-width:96vw;max-height:92vh;background:#fff;border-radius:10px;padding:10px}
+pre{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:14px;overflow-x:auto;font-family:"JetBrains Mono";font-size:.82rem;color:var(--ink)}
+footer{padding:36px 0 60px;color:var(--faint);font-size:.84rem;border-top:1px solid var(--line)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}@media(max-width:860px){.two{grid-template-columns:1fr}}
+/* grid children must be allowed to shrink below their content (long code / equations) */
+.two>*,.dial>*,.grid3>*,.steps>*,.tiles>*{min-width:0}
+@media(max-width:600px){.authors span{white-space:normal}.eq{white-space:normal}.venue{font-size:.62rem;letter-spacing:.08em}.prog{grid-template-columns:120px 1fr 56px}section{padding:52px 0}}
+.prog{display:grid;grid-template-columns:200px 1fr 70px;gap:8px 12px;align-items:center;font-size:.84rem}
+.prog .b{height:8px;background:var(--grid);border-radius:5px;overflow:hidden}.prog .b i{display:block;height:100%;background:var(--s1);border-radius:5px}
+</style>
+</head>
+<body>
+<nav><div class="nav-in">
+  <a class="brand" href="#top"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="#22c1a3"/><stop offset=".5" stop-color="#3987e5"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs><path d="M12 2l8 3v6c0 5.2-3.4 9.4-8 11-4.6-1.6-8-5.8-8-11V5z" fill="none" stroke="url(#lg)" stroke-width="2"/><path d="M8.5 12.2l2.4 2.4 4.8-5" fill="none" stroke="url(#lg)" stroke-width="2" stroke-linecap="round"/></svg><b>PSyGenTAB</b></a>
+  <div class="nav-links"><a href="#dial">Privacy dial</a><a href="#method">Method</a><a href="#map">Results</a><a href="#fairness">Fairness</a><a href="#attacks">Attacks</a><a href="#leaderboard">Leaderboard</a><a href="#verdict">Strengths &amp; limits</a><a href="#figures">Figures</a><a href="#reproduce">Reproduce</a><a href="#cite">Cite</a></div>
+  <button class="tgl" id="theme" aria-label="Toggle light or dark theme">☀︎ / ☾</button>
+</div></nav>
+
+<header class="hero" id="top"><div class="wrap">
+  <div class="venue">Under review · IEEE Journal of Biomedical &amp; Health Informatics</div>
+  <h1><span class="name">PSyGenTAB</span>: Privacy-Constrained Synthetic Health Data at Sampling Time</h1>
+  <p class="tagline">Set a privacy floor. Release the most useful synthetic patient cohort that meets it — for <em>any</em> tabular generator, without retraining.</p>
+  <p class="authors">
+    <span>Arshia Ilaty<sup>*,1,2</sup></span>
+    <span>Hossein Shirazi<sup>1</sup></span>
+    <span>Manasi Chitale<sup>1</sup></span><span>Kedar Hegde<sup>1</sup></span><span>Dhanalakshmi Ramesh<sup>1</sup></span><span>Rashmi S. Manjunath<sup>1</sup></span>
+    <span>Amir M. Rahmani<sup>2</sup></span>
+    <span>Hajar Homayouni<sup>1</sup></span>
+  </p>
+  <p class="affil"><sup>1</sup>San Diego State University, San Diego, CA, USA · <sup>2</sup>University of California, Irvine, CA, USA<br>*Corresponding author: ailaty@uci.edu</p>
+  <div class="cta">
+    <a class="btn primary" href="#dial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 12l4-3"/></svg>Try the privacy dial</a>
+    <span class="btn soon" title="Available after review"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg>Paper (coming soon)</span>
+    <a class="btn" href="https://github.com/ArshiaIlaty/PsyGenTAB"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A11.5 11.5 0 0 0 23.5 12C23.5 5.7 18.3.5 12 .5z"/></svg>Code</a>
+    <a class="btn" href="#map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><circle cx="8" cy="14" r="1.6"/><circle cx="13" cy="9" r="1.6"/><circle cx="18" cy="12" r="1.6"/></svg>Explore results</a>
+    <a class="btn" href="#reproduce"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Data &amp; models</a>
+  </div>
+  <div class="tiles" id="tiles"></div>
+  <div class="banner" id="banner"></div>
+</div></header>
+
+<section id="overview" class="abstract"><div class="wrap">
+  <p class="eyebrow">Overview</p>
+  <h2>Privacy as a dial, not an afterthought</h2>
+  <p>Synthetic patient data can unlock multi-site clinical research, but modern generators memorise their training patients, and differentially private training often destroys the clinical signal that made the data worth sharing. <b>PSyGenTAB</b> treats privacy as a <em>configurable constraint at sampling time</em>. A data custodian picks a privacy floor <i>P</i><sub>min</sub>; PSyGenTAB draws candidate cohorts from an already-trained generator, scores every record against the training data and an unseen calibration holdout, and releases the most useful cohort whose holdout-calibrated privacy score meets the floor — solved exactly with an augmented Lagrangian. Because it only touches sampling, the same trained model can serve an internal team at a permissive floor and an external partner at a strict one.</p>
+  <div class="grid3" style="margin-top:26px">
+    <div class="card"><div class="ic">🧬</div><h3>Generators memorise</h3><p>High-fidelity models place synthetic records measurably closer to training patients than to unseen ones — a membership signal an attacker can exploit.</p></div>
+    <div class="card"><div class="ic">🧯</div><h3>DP is a blunt instrument</h3><p>At strong guarantees (ε = 1), differentially private GANs fall toward chance-level downstream utility on clinical prediction tasks.</p></div>
+    <div class="card"><div class="ic">🎚️</div><h3>PSyGenTAB is a dial</h3><p>A model-agnostic, post-training selection that enforces a custodian-set privacy floor while maximising fidelity and downstream utility.</p></div>
+  </div>
+</div></section>
+
+<section id="dial"><div class="wrap">
+  <p class="eyebrow">Interactive · the privacy dial</p>
+  <h2>Turn the privacy floor and watch the release move</h2>
+  <p class="lead">Every point is real: for each <i>P</i><sub>min</sub> the ALM picked a release on the calibration split, and the numbers shown are that release re-scored on the <b>untouched test split</b>, averaged over every dataset and run.</p>
+  <div class="dial">
+    <div class="panel">
+      <div class="filters"><label>Generator<select id="dgen"></select></label></div>
+      <svg id="dialsvg" width="100%" height="360" role="img" aria-label="Privacy–utility frontier for the selected generator"></svg>
+      <div class="legend" id="dleg"></div>
+    </div>
+    <div class="panel">
+      <h3>Privacy floor <i>P</i><sub>min</sub></h3>
+      <div class="knob"><input type="range" id="pmin" min="0" max="6" step="1" value="4" aria-label="Privacy floor"><span class="val" id="pminv">0.90</span></div>
+      <div class="readout" id="readout"></div>
+      <p class="note" id="dnote"></p>
+    </div>
+  </div>
+</div></section>
+
+<section id="method"><div class="wrap">
+  <p class="eyebrow">Method</p>
+  <h2>Constrained selection, solved at sampling time</h2>
+  <p class="lead">PSyGenTAB never touches the generator's weights. It searches over <em>what to release</em>: a sampling configuration <i>c</i> (e.g. temperature) and a record-acceptance threshold <i>τ</i>.</p>
+  <div class="panel" style="padding:10px 10px 4px">
+  <svg class="pipe" viewBox="0 0 1100 250" role="img" aria-label="PSyGenTAB pipeline">
+    <defs><linearGradient id="pg" x1="0" x2="1"><stop offset="0" stop-color="#22c1a3"/><stop offset=".5" stop-color="#3987e5"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient>
+      <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--faint)"/></marker></defs>
+    <g font-family="Space Grotesk, Inter, sans-serif">
+      <g transform="translate(10,60)"><rect width="150" height="78" rx="14" fill="var(--card2)" stroke="var(--line)"/><text x="75" y="33" text-anchor="middle" style="fill:var(--ink);font-size:15px;font-weight:600">Real train T</text><text x="75" y="54" text-anchor="middle" style="font-size:11.5px">patients the model saw</text></g>
+      <g transform="translate(205,60)"><rect width="150" height="78" rx="14" fill="var(--card2)" stroke="var(--line)"/><text x="75" y="33" text-anchor="middle" style="fill:var(--ink);font-size:15px;font-weight:600">Any generator G</text><text x="75" y="54" text-anchor="middle" style="font-size:11.5px">RTF · GAN · VAE · DDPM</text></g>
+      <g transform="translate(400,60)"><rect width="160" height="78" rx="14" fill="var(--card2)" stroke="var(--line)"/><text x="80" y="33" text-anchor="middle" style="fill:var(--ink);font-size:15px;font-weight:600">Candidate pools</text><text x="80" y="54" text-anchor="middle" style="font-size:11.5px">one per configuration c</text></g>
+      <g transform="translate(605,60)"><rect width="175" height="78" rx="14" fill="var(--card2)" stroke="var(--line)"/><text x="87" y="31" text-anchor="middle" style="fill:var(--ink);font-size:15px;font-weight:600">Proximity check</text><text x="87" y="53" text-anchor="middle" style="font-size:12px;font-family:JetBrains Mono">ρ(s)=d(s,T)/d(s,V)</text></g>
+      <g transform="translate(825,48)"><rect width="150" height="102" rx="14" fill="none" stroke="url(#pg)" stroke-width="2"/><text x="75" y="34" text-anchor="middle" style="fill:var(--ink);font-size:15px;font-weight:700">ALM selection</text><text x="75" y="56" text-anchor="middle" style="font-size:11.5px">max U s.t. P ≥ Pmin</text><text x="75" y="76" text-anchor="middle" style="font-size:11px;font-family:JetBrains Mono">λ ← max(0, λ+μg)</text></g>
+      <g transform="translate(1000,72)"><path d="M45 0l40 15v28c0 24-17 43-40 52-23-9-40-28-40-52V15z" fill="none" stroke="url(#pg)" stroke-width="2.2" transform="translate(-45,0) scale(.86)"/><text x="-6" y="110" text-anchor="middle" style="fill:var(--ink);font-size:13px;font-weight:600">Release</text></g>
+      <g fill="none" stroke="var(--faint)" stroke-width="2" marker-end="url(#arw)">
+        <path class="flow" d="M160 99H203"/><path class="flow" d="M355 99H398"/><path class="flow" d="M560 99H603"/><path class="flow" d="M780 99H823"/><path class="flow" d="M975 99H958"/>
+      </g>
+      <g transform="translate(605,190)"><rect width="175" height="46" rx="12" fill="var(--card2)" stroke="var(--line)" stroke-dasharray="4 4"/><text x="87" y="20" text-anchor="middle" style="fill:var(--ink);font-size:13px;font-weight:600">Calibration holdout V</text><text x="87" y="37" text-anchor="middle" style="font-size:11px">unseen by G · scores U and P</text></g>
+      <path class="flow" d="M692 190V140" fill="none" stroke="var(--faint)" stroke-width="2" marker-end="url(#arw)"/>
+      <path class="flow" d="M780 213H900V152" fill="none" stroke="var(--faint)" stroke-width="2" marker-end="url(#arw)"/>
+      <g transform="translate(10,190)"><rect width="345" height="46" rx="12" fill="var(--card2)" stroke="var(--line)" stroke-dasharray="4 4"/><text x="172" y="20" text-anchor="middle" style="fill:var(--ink);font-size:13px;font-weight:600">Untouched test split</text><text x="172" y="37" text-anchor="middle" style="font-size:11px">every reported number · MIA non-members · TSTR test</text></g>
+    </g>
+  </svg></div>
+  <div class="steps">
+    <div class="card"><h3>Score proximity</h3><p>Each candidate record <i>s</i> gets ρ(s): its distance to an equal-size subsample of the training data divided by its distance to the calibration holdout. ρ ≈ 1 means "no closer to training patients than to strangers".</p></div>
+    <div class="card"><h3>Calibrate privacy</h3><p><i>P</i> combines three holdout-calibrated terms — the share of records closer to train than holdout (two-sided around ½), the NNDR ratio, and excess exact matches — so <i>P</i>=1 means indistinguishable from fresh real data.</p></div>
+    <div class="card"><h3>Maximise utility</h3><p><i>U</i> averages marginal fidelity, association fidelity, a detection test and TSTR effectiveness, all against the calibration holdout.</p></div>
+    <div class="card"><h3>Solve with ALM</h3><p>Powell–Hestenes–Rockafellar augmented Lagrangian over the candidate set; multipliers grow until the floor holds. The selected release is then audited on the untouched test split.</p></div>
+  </div>
+  <div class="two" style="margin-top:18px">
+    <div><div class="eq">max<sub>c,τ</sub>&nbsp; <i>U</i>(c,τ) &nbsp;&nbsp;s.t.&nbsp;&nbsp; <i>P</i>(c,τ) ≥ <i>P</i><sub>min</sub></div>
+      <div class="eq">ℒ = (1−<i>U</i>) + [max(0, λ + μ<i>g</i>)² − λ²] / 2μ,&nbsp;&nbsp; <i>g</i> = <i>P</i><sub>min</sub> − <i>P</i></div></div>
+    <div><div class="eq"><i>P</i><sub>DCR</sub> = 1 − 2·| share<sub>closer-to-train</sub> − ½ |</div>
+      <div class="eq"><i>P</i> = ½·<i>P</i><sub>DCR</sub> + ¼·min(1, NNDR<sub>syn</sub>/NNDR<sub>hold</sub>) + ¼·(1 − excess exact-match)</div></div>
+  </div>
+  <p class="note">Two-sided by design: pushing synthetic records <em>away</em> from training patients is itself a membership signal (Ganev &amp; De Cristofaro, 2023). DP generators are released raw — filtering against training data would void their guarantee.</p>
+</div></section>
+
+<section id="map"><div class="wrap">
+  <p class="eyebrow">Interactive · privacy–utility map</p>
+  <h2>Every method on one map</h2>
+  <p class="lead">Each point is a method; arrows run from a raw generator to the same generator + PSyGenTAB. Up is more useful; toward the dashed line is less leakage. Choose a dataset and any two metrics.</p>
+  <div class="panel">
+    <div class="filters"><label>Dataset<select id="ds"></select></label><label>Privacy (x)<select id="xm"></select></label><label>Utility / fairness (y)<select id="ym"></select></label></div>
+    <svg id="scatter" width="100%" height="470" role="img" aria-label="Privacy–utility map"></svg>
+    <div class="legend" id="leg1"></div>
+  </div>
+  <h3 style="margin-top:34px">Per-dataset effect</h3>
+  <p class="muted" style="margin:0 0 12px">One generator at a time: raw vs. PSyGenTAB (ALM) vs. minimal intervention, ± 1 SD over runs.</p>
+  <div class="panel">
+    <div class="filters"><label>Generator<select id="gsel"></select></label><label>Metric<select id="msel"></select></label></div>
+    <svg id="dots" width="100%" height="430"></svg><div class="legend" id="leg2"></div>
+  </div>
+</div></section>
+
+<section id="fairness"><div class="wrap">
+  <p class="eyebrow">Interactive · fairness &amp; diversity map</p>
+  <h2>Does privacy filtering erase rare patients?</h2>
+  <p class="lead">A distance filter removes the records that sit far from everyone else — exactly where minority subgroups live. We measure representation parity, worst-subgroup utility, rare-category coverage, tail preservation and more, per generator (mean over datasets, ± 1 SD across datasets).</p>
+  <div class="panel">
+    <div class="filters"><label>Metric<select id="fsel"></select></label></div>
+    <svg id="fair" width="100%" height="340"></svg><div class="legend" id="leg3"></div>
+  </div>
+</div></section>
+
+<section id="attacks"><div class="wrap">
+  <p class="eyebrow">Privacy audit</p>
+  <h2>Attacked five ways</h2>
+  <p class="lead">Every release is attacked by an adversary who knows its members are drawn from the training split and its non-members from the untouched test split. AUC 0.5 = the attacker learns nothing.</p>
+  <div class="grid3">
+    <div class="card"><h3>Distance MIA</h3><p>Black-box: a record is called a member if it sits close to the synthetic data.</p></div>
+    <div class="card"><h3>DOMIAS</h3><p>Density-ratio attack (van Breugel et al., 2023): local over-density of synthetic data around a record, relative to a reference population.</p></div>
+    <div class="card"><h3>Shadow-model MIA</h3><p>TAPAS-style: the attacker retrains the generator 60 times with and without the most isolated patients and learns a per-target classifier.</p></div>
+    <div class="card"><h3>Attribute inference</h3><p>Anonymeter (Giomi et al., 2023): can the outcome of a known patient be inferred from the release, beyond a control baseline?</p></div>
+    <div class="card"><h3>Linkability</h3><p>Anonymeter: can two halves of a patient's record be linked through the synthetic data?</p></div>
+  </div>
+  <h3 style="margin-top:32px">Shadow-model attack: the strongest adversary</h3>
+  <p class="muted" style="margin:0 0 12px">The attacker retrains each generator on 60 worlds with and without the 5 most isolated (most vulnerable) training patients. Each cell shows how much PSyGenTAB changes the attacker's advantage |AUC − 0.5| for one generator on one dataset: <b style="color:var(--s3)">green = leaks less</b>, <b style="color:var(--s2)">orange = leaks more</b>. The right column gives the mean advantage, raw → PSyGenTAB. Click a row for the per-dataset detail.</p>
+  <div class="panel"><svg id="tapashm" class="hm" width="100%" height="330"></svg><div class="legend" id="tapassum"></div></div>
+  <div class="panel" style="margin-top:14px"><div class="chips" id="tapaschips"></div><svg id="tapas" width="100%" height="380"></svg><div class="legend" id="leg4"></div>
+  <p class="note muted" style="font-size:.85rem;margin:8px 0 0">An AUC below 0.5 means the attacker's guesses are systematically inverted. |AUC − 0.5| still counts it as leakage, which is conservative: in practice an attacker cannot know to flip their guesses without labelled data.</p></div>
+</div></section>
+
+<section id="leaderboard"><div class="wrap">
+  <p class="eyebrow">Leaderboard &amp; statistics</p>
+  <h2>How every method ranks</h2>
+  <p class="lead">Average rank across datasets (1 = best). Utility: TSTR AUROC, macro-F1, α-precision. Privacy: <i>P</i>, distance-MIA, DOMIAS, attribute inference (AUCs by distance from 0.5). Fairness: parity, minority-class ratio, worst-subgroup utility, rare-category coverage, entropy and tails. Overall = mean of utility and privacy ranks. Click a column to sort.</p>
+  <div class="tablebox"><table id="board"></table></div>
+  <h3 style="margin-top:32px">Is the effect of PSyGenTAB significant?</h3>
+  <p class="muted" style="margin:0 0 12px">Wilcoxon signed-rank tests of generator + PSyGenTAB vs. the same raw generator, paired across datasets, Holm-corrected across generators. Δ is in the "better" direction (positive = PSyGenTAB better).</p>
+  <div class="filters"><label>Metric<select id="ssel"></select></label></div>
+  <div class="tablebox" style="max-height:none"><table id="stats"></table></div>
+</div></section>
+
+<section id="verdict" class="verdict"><div class="wrap">
+  <p class="eyebrow">Honest assessment</p>
+  <h2>Where PSyGenTAB shines, and where it falls short</h2>
+  <p class="lead">Every number below comes from the same result files as the paper (95% confidence intervals in brackets). We report the failures with the same care as the wins, together with what we think explains them.</p>
+  <div class="two">
+    <div><h3 class="col"><i style="background:var(--s3)"></i>Where it shines</h3><div id="shines"></div></div>
+    <div><h3 class="col"><i style="background:var(--s2)"></i>Where it falls short, and why</h3><div id="falls"></div></div>
+  </div>
+</div></section>
+
+<section id="datasets"><div class="wrap">
+  <p class="eyebrow">Benchmarks</p>
+  <h2>Ten datasets, seven clinical</h2>
+  <p class="lead">Each split 60 / 20 / 20 into generator-train, calibration holdout and untouched test; 5 splits × 3 generator seeds for the core models. ID columns removed; Liver uses the corrected <code>drinks &gt; 3</code> label (the UCI <code>selector</code> column is not a diagnosis).</p>
+  <div class="two">
+    <div class="tablebox" style="max-height:none"><table id="dtable"></table></div>
+    <div class="panel"><h3>Study progress</h3><p class="muted" style="margin:0 0 12px;font-size:.88rem">Finished runs per model (each run = one split × seed × dataset).</p><div class="prog" id="prog"></div></div>
+  </div>
+</div></section>
+
+<section id="figures"><div class="wrap">
+  <p class="eyebrow">Paper figures</p>
+  <h2>Figures</h2>
+  <p class="lead">Static versions for the manuscript (click to enlarge; PDFs alongside in <code>assets/</code>).</p>
+  <div class="gallery" id="gallery"></div>
+</div></section>
+
+<section id="reproduce"><div class="wrap">
+  <p class="eyebrow">Reproducibility</p>
+  <h2>Data, models and code</h2>
+  <div class="two">
+    <div>
+      <p class="muted">Every number on this page is produced by one resumable pipeline. Each run writes its released synthetic datasets, candidate tables, ALM traces, fitted model (GPU models) and a full evaluation JSON.</p>
+      <pre># environment (Python 3.10, pinned)
+pip install -r requirements-study.txt
+
+# CPU lane: BayesNet, ARF, TVAE, CTGAN, TabDDPM, PATE-GAN
+python -m scripts.run_all --lane cpu --workers 3
+# GPU lane: REaLTabFormer, CTAB-GAN+, DP-CTAB-GAN+
+python -m scripts.run_all --lane gpu --workers 8 --gpus 0,1,2,3
+
+# analysis
+python -m scripts.tapas_attack --dataset heart_failure --generator rtf
+python -m scripts.ablations && python -m scripts.aggregate
+python -m scripts.figures   && python -m scripts.build_site</pre>
+    </div>
+    <div class="card">
+      <h3>Artifacts for reviewers</h3>
+      <p>• Released synthetic datasets for every run and method<br>• Fitted generators (REaLTabFormer, CTAB-GAN+, DP-CTAB-GAN+)<br>• Candidate tables and ALM traces (every ablation is recomputable offline)<br>• Per-run evaluation JSONs, statistical tables and LaTeX</p>
+      <p style="margin-top:12px"><span class="pill">Protocol</span> 60/20/20 split · train cap 2,000 rows · CatBoost TSTR (pre-declared) · Friedman/Nemenyi · Wilcoxon + Holm</p>
+      <p style="margin-top:12px"><span class="pill">DP</span> DP-SGD on the critic with Poisson sampling, per-record clipping and RDP accounting; δ = n<sup>−1.1</sup>. Weight-clipping and gradient-penalty variants.</p>
+    </div>
+  </div>
+</div></section>
+
+<section id="cite"><div class="wrap">
+  <p class="eyebrow">Citation</p>
+  <h2>BibTeX</h2>
+  <pre id="bib">@article{ilaty2026psygentab,
+  title   = {PSyGenTAB: Privacy-Constrained Synthetic Health Data Generation at Sampling Time},
+  author  = {Ilaty, Arshia and Shirazi, Hossein and Chitale, Manasi and Hegde, Kedar and
+             Ramesh, Dhanalakshmi and Manjunath, Rashmi S. and Rahmani, Amir M. and Homayouni, Hajar},
+  journal = {Under review, IEEE Journal of Biomedical and Health Informatics},
+  year    = {2026}
+}</pre>
+  <button class="tgl" id="copybib">Copy BibTeX</button>
+</div></section>
+
+<footer><div class="wrap">PSyGenTAB · San Diego State University &amp; UC Irvine · Built <span id="built"></span>. All 1,600 runs and 70 shadow-model settings are complete.</div></footer>
+<div class="tip" id="tip"></div><div class="lightbox" id="lb"><img alt=""></div>
+
+<script>
+const D = __DATA__;
+const $ = s => document.querySelector(s);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = (v,d=3) => v==null||isNaN(v) ? '—' : (+v).toFixed(d);
+const FAM = {base:{lab:'Raw generator',col:'--s3',shape:'circle'},psygentab:{lab:'+ PSyGenTAB (ALM)',col:'--s1',shape:'diamond'},
+  psygentab_min:{lab:'+ PSyGenTAB (min. intervention)',col:'--s1',shape:'diamond',hollow:true},dp:{lab:'DP baseline',col:'--s2',shape:'square'}};
+const tip=$('#tip');
+function showTip(e,h){tip.innerHTML=h;tip.style.display='block';tip.style.left=Math.min(e.clientX+14,innerWidth-tip.offsetWidth-8)+'px';tip.style.top=Math.min(e.clientY+14,innerHeight-tip.offsetHeight-8)+'px';}
+function hideTip(){tip.style.display='none';}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideTip();$('#lb').style.display='none';}});
+function opt(sel,items,val){sel.innerHTML=items.map(([k,l,dis])=>`<option value="${k}" ${dis?'disabled':''}>${l}</option>`).join('');if(val)sel.value=val;}
+function scale(d0,d1,r0,r1){return v=>r0+(v-d0)/((d1-d0)||1)*(r1-r0);}
+function niceExt(vals,ref){vals=vals.filter(v=>v!=null&&!isNaN(v));let lo=Math.min(...vals),hi=Math.max(...vals);if(ref!=null){lo=Math.min(lo,ref);hi=Math.max(hi,ref);}const p=(hi-lo)*0.08||0.01;return[lo-p,hi+p];}
+function ticks(lo,hi,n=6){const st=Math.pow(10,Math.floor(Math.log10((hi-lo)/n)));const m=[1,2,2.5,5,10].find(k=>(hi-lo)/(st*k)<=n)*st;const o=[];for(let v=Math.ceil(lo/m)*m;v<=hi+1e-12;v+=m)o.push(+v.toFixed(10));return o;}
+function marker(shape,x,y,r,fill,hollow){const s=css('--surface'),f=hollow?s:fill,st=hollow?fill:s,sw=hollow?1.8:1.5;
+  if(shape==='circle')return `<circle cx="${x}" cy="${y}" r="${r}" fill="${f}" stroke="${st}" stroke-width="${sw}"/>`;
+  if(shape==='square')return `<rect x="${x-r}" y="${y-r}" width="${2*r}" height="${2*r}" rx="1.5" fill="${f}" stroke="${st}" stroke-width="${sw}"/>`;
+  return `<path d="M${x} ${y-r*1.25}L${x+r*1.15} ${y}L${x} ${y+r*1.25}L${x-r*1.15} ${y}Z" fill="${f}" stroke="${st}" stroke-width="${sw}"/>`;}
+function grid(W,H,m,xs,ys,xt,yt,xl,yl){let g='';
+  xt.forEach(t=>{const x=xs(t);g+=`<line x1="${x}" x2="${x}" y1="${m.t}" y2="${H-m.b}" stroke="${css('--grid')}"/><text x="${x}" y="${H-m.b+16}" text-anchor="middle">${t}</text>`;});
+  if(yt)yt.forEach(t=>{const y=ys(t);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="${css('--grid')}"/><text x="${m.l-8}" y="${y+4}" text-anchor="end">${t}</text>`;});
+  if(xl)g+=`<text class="axis-title" x="${(m.l+W-m.r)/2}" y="${H-6}" text-anchor="middle">${xl}</text>`;
+  if(yl)g+=`<text class="axis-title" transform="translate(14 ${(m.t+H-m.b)/2}) rotate(-90)" text-anchor="middle">${yl}</text>`;return g;}
+function legend(el,fams){el.innerHTML=fams.map(f=>{const F=FAM[f];return `<span><svg width="14" height="14">${marker(F.shape,7,7,5,css(F.col),F.hollow)}</svg>${F.lab}</span>`;}).join('');}
+const refOf=k=>!D.metrics[k]?null:D.metrics[k].dir==='half'?0.5:(D.metrics[k].dir==='one'?1:null);
+const gl=g=>D.gens[g]||D.gen_labels[g]||g;
+
+/* ---------------- hero tiles & banner ---------------- */
+function renderHero(){
+  const b=Object.fromEntries(D.board.map(r=>[r.method,r]));
+  const pairs=Object.keys(D.gens).filter(g=>b[g]&&b[g+'+psygentab']);
+  const avg=f=>pairs.length?pairs.reduce((a,g)=>a+f(g),0)/pairs.length:NaN;
+  const dDom=avg(g=>Math.abs(b[g].mia_domias_auc-.5)-Math.abs(b[g+'+psygentab'].mia_domias_auc-.5));
+  const dU=avg(g=>b[g+'+psygentab'].tstr_catboost_auroc-b[g].tstr_catboost_auroc);
+  // pooled: total excess AUC removed / total raw excess AUC
+  const ex=(g,s)=>Math.abs(b[g+s].mia_dist_auc-.5);
+  const rawEx=pairs.reduce((a,g)=>a+ex(g,''),0),psyEx=pairs.reduce((a,g)=>a+ex(g,'+psygentab'),0);
+  const rel=rawEx>0?Math.round(100*(rawEx-psyEx)/rawEx):NaN;
+  $('#tiles').innerHTML=[
+    ['Released datasets evaluated',D.n_runs.toLocaleString(),`${D.board.length} methods · 10 datasets`],
+    ['Distance-attack leakage removed',isNaN(rel)?'—':rel+'%',`pooled excess AUC, ${pairs.length} generators`],
+    ['DOMIAS leakage removed',fmt(dDom,3),'reduction of |AUC − 0.5|'],
+    ['Utility change',(dU>=0?'+':'')+fmt(dU,3),'TSTR AUROC, PSyGenTAB − raw']].map(([k,v,d])=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join('');
+  const done=D.progress.reduce((a,p)=>a+Math.min(p.done,p.planned),0),plan=D.progress.reduce((a,p)=>a+p.planned,0);
+  const inc=D.progress.filter(p=>p.done<p.planned).map(p=>gl(p.generator.replace(/_eps\d+$/,''))+(/_eps/.test(p.generator)?' ε='+p.generator.split('_eps')[1]:''));
+  $('#banner').innerHTML=done<plan?`<b>Live results — preliminary.</b> ${done.toLocaleString()} of ${plan.toLocaleString()} planned runs finished (${Math.round(100*done/plan)}%). Still running: ${inc.join(', ')}.<div class="bar"><i style="width:${100*done/plan}%"></i></div>`:'<b>All planned runs complete.</b>';
+}
+
+/* ---------------- privacy dial ---------------- */
+const SW=D.sweep||{};
+const dialGens=Object.keys(D.gens).filter(g=>SW[g]&&SW[g].alm);
+function renderDial(){
+  opt($('#dgen'),Object.keys(D.gens).map(g=>[g,gl(g)+(SW[g]&&SW[g].alm?'':' — pending'),!(SW[g]&&SW[g].alm)]),$('#dgen').value||(dialGens.includes('rtf')?'rtf':dialGens[0]));
+  const g=$('#dgen').value;const S=SW[g];const svg=$('#dialsvg');
+  if(!S){svg.innerHTML='<text x="20" y="40">pending (GPU run)</text>';return;}
+  const alm=S.alm,mi=S.min_intervention||[],un=(S.unconstrained||[])[0];
+  const pm=alm.map(r=>r.p_min);$('#pmin').max=pm.length-1;
+  const i=Math.min(+$('#pmin').value,pm.length-1);const cur=alm[i];$('#pminv').textContent=cur.p_min.toFixed(2);
+  const W=svg.clientWidth||640,H=360,m={l:58,r:20,t:16,b:44};
+  const pts=alm.concat(mi).concat(un?[un]:[]);
+  const[x0,x1]=niceExt(pts.map(r=>r.P_test)),[y0,y1]=niceExt(pts.map(r=>r.U_test));
+  const xs=scale(x0,x1,m.l,W-m.r),ys=scale(y0,y1,H-m.b,m.t);
+  let s=grid(W,H,m,xs,ys,ticks(x0,x1,5),ticks(y0,y1,5),'Test privacy P →','Test utility U →');
+  if(cur.p_min>=x0&&cur.p_min<=x1)s+=`<line x1="${xs(cur.p_min)}" x2="${xs(cur.p_min)}" y1="${m.t}" y2="${H-m.b}" stroke="${css('--accent')}" stroke-dasharray="3 4" opacity=".8"/><text x="${xs(cur.p_min)+5}" y="${m.t+12}" style="fill:${css('--accent')}">P = Pmin</text>`;
+  else s+=`<text x="${m.l+6}" y="${m.t+12}" style="fill:${css('--accent')}">← floor P = ${cur.p_min.toFixed(2)} lies left of every release</text>`;
+  const path=a=>a.map((r,k)=>(k?'L':'M')+xs(r.P_test)+' '+ys(r.U_test)).join('');
+  if(mi.length)s+=`<path d="${path(mi)}" fill="none" stroke="${css('--s1')}" stroke-width="1.6" stroke-dasharray="2 4" opacity=".9"/>`;
+  s+=`<path d="${path(alm)}" fill="none" stroke="${css('--s1')}" stroke-width="2.2"/>`;
+  mi.forEach(r=>{s+=marker('diamond',xs(r.P_test),ys(r.U_test),3.8,css('--s1'),true);});
+  alm.forEach((r,k)=>{s+=`<g class="dp" data-k="${k}">${marker('diamond',xs(r.P_test),ys(r.U_test),k===i?7:4.5,css('--s1'),false)}<circle cx="${xs(r.P_test)}" cy="${ys(r.U_test)}" r="13" fill="transparent"/></g>`;});
+  s+=`<circle cx="${xs(cur.P_test)}" cy="${ys(cur.U_test)}" r="13" fill="none" stroke="${css('--accent')}" stroke-width="2"><animate attributeName="r" values="11;15;11" dur="1.8s" repeatCount="indefinite"/></circle>`;
+  if(un)s+=marker('circle',xs(un.P_test),ys(un.U_test),6,css('--s3'),false)+`<text x="${xs(un.P_test)+9}" y="${ys(un.U_test)+4}">no privacy floor</text>`;
+  svg.innerHTML=s;
+  svg.querySelectorAll('.dp').forEach(el=>{const r=alm[+el.dataset.k];el.style.cursor='pointer';el.onclick=()=>{$('#pmin').value=el.dataset.k;renderDial();};
+    el.onmousemove=e=>showTip(e,`<b>P<sub>min</sub> = ${r.p_min.toFixed(2)}</b><br>test P ${fmt(r.P_test)} · test U ${fmt(r.U_test)}<br>runs meeting the floor on test: ${Math.round(100*r.feasible_test)}%`);el.onmouseleave=hideTip;});
+  $('#dleg').innerHTML=`<span><svg width="14" height="14">${marker('diamond',7,7,5,css('--s1'))}</svg>PSyGenTAB (ALM), one point per P<sub>min</sub></span><span><svg width="14" height="14">${marker('diamond',7,7,5,css('--s1'),true)}</svg>Minimal intervention</span><span><svg width="14" height="14">${marker('circle',7,7,5,css('--s3'))}</svg>Unconstrained (max U)</span>`;
+  const base=un||{};
+  const rd=[['Test privacy P',fmt(cur.P_test),un?`${(cur.P_test-base.P_test>=0?'+':'')+fmt(cur.P_test-base.P_test)} vs. no floor`:''],
+    ['Test utility U',fmt(cur.U_test),un?`${(cur.U_test-base.U_test>=0?'+':'')+fmt(cur.U_test-base.U_test)} vs. no floor`:''],
+    ['TSTR macro-F1',fmt(cur.tstr_f1_test),'train synthetic, test real'],['Distance-MIA AUC',fmt(cur.mia_dist_auc_test),'0.5 = attacker learns nothing'],
+    ['Records closer to train',fmt(cur.share_test,2),'0.50 = ideal'],['Floor met on test',Math.round(100*cur.feasible_test)+'%','share of runs, untouched split']];
+  $('#readout').innerHTML=rd.map(([k,v,d])=>`<div><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join('');
+  $('#dnote').textContent=`${gl(g)} · mean over ${S.n_runs} runs across datasets. Mean acceptance threshold quantile at this floor: ${fmt(cur.tau_q,2)} (0 = no records filtered).`;
+}
+$('#pmin').oninput=renderDial;$('#dgen').onchange=renderDial;
+
+/* ---------------- maps (shared with the review page) ---------------- */
+opt($('#ds'),[['__all__','All datasets']].concat(Object.entries(D.datasets)),'__all__');
+const priv=['mia_domias_auc','mia_dist_auc','P','aia_risk','link_risk','share_closer_train'].filter(k=>D.metrics[k]);
+const util=['tstr_catboost_auroc','tstr_catboost_f1_macro','alpha_precision','beta_recall','c2st_auc'].concat(D.fair).filter(k=>D.metrics[k]);
+opt($('#xm'),priv.map(k=>[k,D.metrics[k].label]),'mia_domias_auc');opt($('#ym'),util.map(k=>[k,D.metrics[k].label]),'tstr_catboost_auroc');
+opt($('#gsel'),Object.entries(D.gens),'rtf');opt($('#msel'),Object.keys(D.metrics).map(k=>[k,D.metrics[k].label]),'mia_domias_auc');
+opt($('#fsel'),D.fair.map(k=>[k,D.metrics[k].label]),'repr_parity');
+['#ds','#xm','#ym'].forEach(s=>$(s).onchange=renderScatter);['#gsel','#msel'].forEach(s=>$(s).onchange=renderDots);$('#fsel').onchange=renderFair;
+function cellsFor(ds){if(ds!=='__all__')return D.cells.filter(c=>c.dataset===ds);const by={};D.cells.forEach(c=>{(by[c.method]=by[c.method]||[]).push(c);});
+  return Object.entries(by).map(([m,arr])=>{const o={method:m,n:arr.length};Object.keys(D.metrics).forEach(k=>{const v=arr.map(a=>a[k]).filter(x=>x!=null);o[k]=v.length?v.reduce((a,b)=>a+b,0)/v.length:null;
+    o[k+'_sd']=v.length>1?Math.sqrt(v.reduce((a,b)=>a+(b-o[k])**2,0)/(v.length-1)):null;});return o;});}
+function renderScatter(){
+  const svg=$('#scatter'),W=svg.clientWidth||900,H=470,m={l:62,r:24,t:18,b:46};const ds=$('#ds').value,xm=$('#xm').value,ym=$('#ym').value;
+  const cells=cellsFor(ds).filter(c=>c[xm]!=null&&c[ym]!=null&&D.methods[c.method]);if(!cells.length){svg.innerHTML='<text x="20" y="40">No results for this selection yet.</text>';return;}
+  const xref=refOf(xm),yref=ym==='tstr_catboost_auroc'?D.trtr[ds]:refOf(ym);
+  const[x0,x1]=niceExt(cells.map(c=>c[xm]),xref),[y0,y1]=niceExt(cells.map(c=>c[ym]),yref);const xs=scale(x0,x1,m.l,W-m.r),ys=scale(y0,y1,H-m.b,m.t);
+  let g=grid(W,H,m,xs,ys,ticks(x0,x1),ticks(y0,y1),D.metrics[xm].label+(xref!=null?` (${xref} = ideal)`:''),D.metrics[ym].label);
+  if(xref!=null)g+=`<line x1="${xs(xref)}" x2="${xs(xref)}" y1="${m.t}" y2="${H-m.b}" stroke="${css('--ref')}" stroke-dasharray="4 3"/>`;
+  if(yref!=null){g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${ys(yref)}" y2="${ys(yref)}" stroke="${css('--ref')}" stroke-dasharray="2 3"/>`;if(ym==='tstr_catboost_auroc')g+=`<text x="${W-m.r-4}" y="${ys(yref)-6}" text-anchor="end">trained on real data</text>`;}
+  const byM=Object.fromEntries(cells.map(c=>[c.method,c]));
+  cells.forEach(c=>{const md=D.methods[c.method];if(md.family==='psygentab'&&byM[md.gen]){const a=byM[md.gen];g+=`<line x1="${xs(a[xm])}" y1="${ys(a[ym])}" x2="${xs(c[xm])}" y2="${ys(c[ym])}" stroke="${css('--ref')}" stroke-width="1.3" marker-end="url(#ah)"/>`;}});
+  const ord={base:0,dp:1,psygentab_min:2,psygentab:3};const boxes=[];
+  // selective direct labels: PSyGenTAB points by generator; a label is dropped if it would collide (hover still works)
+  const place=(txt,x,y)=>{const w=txt.length*6.2+4,cand=[[x+8,y-7],[x+8,y+15],[x-8-w,y-7],[x-8-w,y+15]];
+    for(const[lx,ly]of cand){const bx=[lx,ly-11,lx+w,ly+3];if(lx<m.l||lx+w>W-m.r)continue;if(!boxes.some(o=>!(bx[2]<o[0]||bx[0]>o[2]||bx[3]<o[1]||bx[1]>o[3]))){boxes.push(bx);return `<text x="${lx}" y="${ly}">${txt}</text>`;}}return '';};
+  let lab='';const dpPts=[];
+  cells.sort((a,b)=>ord[D.methods[a.method].family]-ord[D.methods[b.method].family]).forEach(c=>{const md=D.methods[c.method],F=FAM[md.family]||FAM.base,x=xs(c[xm]),y=ys(c[ym]);
+    g+=`<g class="pt" data-m="${c.method}">${marker(F.shape,x,y,5.5,css(F.col),F.hollow)}<circle cx="${x}" cy="${y}" r="12" fill="transparent"/></g>`;
+    if(md.family==='dp')dpPts.push([x,y]);});
+  cells.filter(c=>D.methods[c.method].family==='psygentab').sort((a,b)=>ys(a[ym])-ys(b[ym])).forEach(c=>{lab+=place(gl(D.methods[c.method].gen),xs(c[xm]),ys(c[ym]));});
+  if(dpPts.length){const cx=dpPts.reduce((a,p)=>a+p[0],0)/dpPts.length,cy=Math.max(...dpPts.map(p=>p[1]));lab+=place('DP baselines (hover for ε)',cx,cy+10);}
+  g+=lab;
+  svg.innerHTML=`<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${css('--ref')}"/></marker></defs>`+g;
+  svg.querySelectorAll('.pt').forEach(el=>{const c=byM[el.dataset.m];el.onmousemove=e=>showTip(e,`<b>${D.methods[c.method].label}</b><br><span class="r">${ds==='__all__'?'mean over '+c.n+' datasets':D.datasets[ds]+', '+c.n+' runs'}</span><br>${D.metrics[xm].label}: <b>${fmt(c[xm])}</b>${c[xm+'_sd']!=null?' ± '+fmt(c[xm+'_sd']):''}<br>${D.metrics[ym].label}: <b>${fmt(c[ym])}</b>${c[ym+'_sd']!=null?' ± '+fmt(c[ym+'_sd']):''}`);el.onmouseleave=hideTip;});
+  legend($('#leg1'),['base','psygentab','psygentab_min','dp'].filter(f=>cells.some(c=>D.methods[c.method].family===f)));
+}
+function renderDots(){
+  const svg=$('#dots'),W=svg.clientWidth||900,H=430,m={l:120,r:24,t:14,b:46};const g0=$('#gsel').value,met=$('#msel').value,dsets=Object.keys(D.datasets);
+  const vars=[['base',g0],['psygentab',g0+'+psygentab'],['psygentab_min',g0+'+psygentab_min']];const rows=D.cells.filter(c=>vars.some(v=>v[1]===c.method)&&c[met]!=null);
+  if(!rows.length){svg.innerHTML=`<text x="20" y="40">${gl(g0)}: pending (GPU run) — no results yet.</text>`;$('#leg2').innerHTML='';return;}
+  const ref=refOf(met);const[x0,x1]=niceExt(rows.flatMap(c=>[c[met]-(c[met+'_sd']||0),c[met]+(c[met+'_sd']||0)]),ref);const xs=scale(x0,x1,m.l,W-m.r),band=(H-m.t-m.b)/dsets.length;
+  let g=grid(W,H,m,xs,null,ticks(x0,x1),null,D.metrics[met].label+(ref!=null?` (${ref} = ideal)`:''),null);
+  if(ref!=null)g+=`<line x1="${xs(ref)}" x2="${xs(ref)}" y1="${m.t}" y2="${H-m.b}" stroke="${css('--ref')}" stroke-dasharray="4 3"/>`;
+  dsets.forEach((d,i)=>{const yc=m.t+band*(i+0.5);g+=`<text x="${m.l-10}" y="${yc+4}" text-anchor="end">${D.datasets[d]}</text>`;
+    vars.forEach(([f,mm],k)=>{const c=rows.find(r=>r.method===mm&&r.dataset===d);if(!c)return;const y=yc+(k-1)*band*0.26,x=xs(c[met]),F=FAM[f];
+      if(c[met+'_sd']!=null)g+=`<line x1="${xs(c[met]-c[met+'_sd'])}" x2="${xs(c[met]+c[met+'_sd'])}" y1="${y}" y2="${y}" stroke="${css(F.col)}" stroke-width="1.5" opacity=".7"/>`;
+      g+=`<g class="dd" data-k="${mm}|${d}">${marker(F.shape,x,y,4.8,css(F.col),F.hollow)}<rect x="${x-10}" y="${y-8}" width="20" height="16" fill="transparent"/></g>`;});});
+  svg.innerHTML=g;svg.querySelectorAll('.dd').forEach(el=>{const[mm,d]=el.dataset.k.split('|');const c=rows.find(r=>r.method===mm&&r.dataset===d);
+    el.onmousemove=e=>showTip(e,`<b>${D.methods[mm].label}</b><br><span class="r">${D.datasets[d]}, ${c.n} runs</span><br>${D.metrics[met].label}: <b>${fmt(c[met])}</b>${c[met+'_sd']!=null?' ± '+fmt(c[met+'_sd']):''}`);el.onmouseleave=hideTip;});
+  legend($('#leg2'),['base','psygentab','psygentab_min']);
+}
+function renderFair(){
+  const svg=$('#fair'),W=svg.clientWidth||900,H=340,m={l:130,r:24,t:14,b:46},met=$('#fsel').value,ref=refOf(met);const gens=Object.keys(D.gens),vars=[['base',''],['psygentab','+psygentab'],['psygentab_min','+psygentab_min']];
+  const stat=mm=>{const v=D.cells.filter(c=>c.method===mm&&c[met]!=null).map(c=>c[met]);if(!v.length)return null;const mu=v.reduce((a,b)=>a+b,0)/v.length;return{mu,sd:v.length>1?Math.sqrt(v.reduce((a,b)=>a+(b-mu)**2,0)/(v.length-1)):0,n:v.length};};
+  const S={};gens.forEach(g=>vars.forEach(([f,s])=>{S[g+s]=stat(g+s);}));const all=Object.values(S).filter(Boolean);if(!all.length){svg.innerHTML='<text x="20" y="40">Not computed yet.</text>';return;}
+  const[x0,x1]=niceExt(all.flatMap(s=>[s.mu-s.sd,s.mu+s.sd]),ref);const xs=scale(x0,x1,m.l,W-m.r),band=(H-m.t-m.b)/gens.length;
+  let g=grid(W,H,m,xs,null,ticks(x0,x1),null,`${D.metrics[met].label}${ref!=null?` (${ref} = ideal)`:''} — ${D.metrics[met].dir==='down'?'lower':'higher'} is better${ref!=null?' / closer to ideal':''}`,null);
+  if(ref!=null)g+=`<line x1="${xs(ref)}" x2="${xs(ref)}" y1="${m.t}" y2="${H-m.b}" stroke="${css('--ref')}" stroke-dasharray="4 3"/>`;
+  gens.forEach((gn,i)=>{const yc=m.t+band*(i+0.5);g+=`<text x="${m.l-10}" y="${yc+4}" text-anchor="end">${gl(gn)}</text>`;
+    if(!S[gn]){g+=`<text x="${(m.l+W-m.r)/2}" y="${yc+4}" text-anchor="middle" font-style="italic">pending (GPU run)</text>`;return;}
+    vars.forEach(([f,suf],k)=>{const s=S[gn+suf];if(!s)return;const y=yc+(k-1)*band*0.26,x=xs(s.mu),F=FAM[f];
+      g+=`<line x1="${xs(s.mu-s.sd)}" x2="${xs(s.mu+s.sd)}" y1="${y}" y2="${y}" stroke="${css(F.col)}" stroke-width="1.5" opacity=".7"/><g class="fp" data-k="${gn+suf}">${marker(F.shape,x,y,4.8,css(F.col),F.hollow)}<rect x="${x-10}" y="${y-8}" width="20" height="16" fill="transparent"/></g>`;});});
+  svg.innerHTML=g;svg.querySelectorAll('.fp').forEach(el=>{const mm=el.dataset.k,s=S[mm];el.onmousemove=e=>showTip(e,`<b>${D.methods[mm].label}</b><br><span class="r">mean over ${s.n} datasets</span><br>${D.metrics[met].label}: <b>${fmt(s.mu)}</b> ± ${fmt(s.sd)}`);el.onmouseleave=hideTip;});
+  legend($('#leg3'),['base','psygentab','psygentab_min']);
+}
+
+/* ---------------- shadow-model attack: heatmap + dumbbells ---------------- */
+const TG=['tabddpm','bayesian_network','ctabgan_plus','tvae','rtf','ctgan','arf'];
+let tapasGen='tabddpm';
+const adv=v=>Math.abs(v-0.5);
+function tapasRows(){return D.tapas.filter(r=>!r.pending&&r.raw_auc_mean!=null);}
+function renderTapasHeat(){
+  const svg=$('#tapashm'),W=svg.clientWidth||900,rows=tapasRows(),dsets=Object.keys(D.datasets).filter(d=>rows.some(r=>r.dataset===d));
+  const gens=TG.filter(g=>rows.some(r=>r.generator===g));
+  const m={l:130,r:150,t:64,b:10},cw=(W-m.l-m.r)/dsets.length,ch=34,H=m.t+ch*gens.length+m.b;svg.setAttribute('height',H);
+  const s2=css('--s2'),s3=css('--s3'),bg=css('--card2');
+  const col=v=>{const t=Math.min(1,Math.abs(v)/0.2);return `color-mix(in srgb, ${v>=0?s3:s2} ${Math.round(12+88*t)}%, ${bg})`;};
+  let g='';
+  dsets.forEach((d,j)=>{const x=m.l+cw*(j+0.5);g+=`<text transform="translate(${x},${m.t-8}) rotate(-35)" text-anchor="start">${D.datasets[d]}</text>`;});
+  g+=`<text x="${W-m.r+12}" y="${m.t-10}" font-weight="600">mean advantage</text>`;
+  gens.forEach((gn,i)=>{const y=m.t+ch*i;const rr=rows.filter(r=>r.generator===gn);
+    g+=`<text x="${m.l-10}" y="${y+ch/2+4}" text-anchor="end" ${gn===tapasGen?'font-weight="700" style="fill:var(--ink)"':''}>${gl(gn)}</text>`;
+    dsets.forEach((d,j)=>{const r=rr.find(q=>q.dataset===d);if(!r)return;const v=adv(r.raw_auc_mean)-adv(r.psygentab_auc_mean);
+      g+=`<rect class="cell${gn===tapasGen?' sel':''}" data-g="${gn}" data-d="${d}" x="${m.l+cw*j+1.5}" y="${y+1.5}" width="${cw-3}" height="${ch-3}" rx="5" fill="${col(v)}"/>`;
+      g+=`<text x="${m.l+cw*(j+0.5)}" y="${y+ch/2+4}" text-anchor="middle" style="pointer-events:none;fill:var(--ink)">${v>=0?'+':'−'}${Math.abs(v).toFixed(2)}</text>`;});
+    const ra=rr.reduce((a,r)=>a+adv(r.raw_auc_mean),0)/rr.length,pa=rr.reduce((a,r)=>a+adv(r.psygentab_auc_mean),0)/rr.length;
+    const better=rr.filter(r=>adv(r.raw_auc_mean)-adv(r.psygentab_auc_mean)>0.01).length;
+    g+=`<text x="${W-m.r+12}" y="${y+ch/2+4}" style="fill:${pa<ra-0.01?s3:pa>ra+0.01?s2:'var(--mut)'}">${ra.toFixed(3)} → ${pa.toFixed(3)} <tspan style="fill:var(--faint)">(${better}/${rr.length})</tspan></text>`;});
+  svg.innerHTML=g;
+  svg.querySelectorAll('.cell').forEach(el=>{const r=rows.find(q=>q.generator===el.dataset.g&&q.dataset===el.dataset.d);
+    el.onmousemove=e=>showTip(e,`<b>${D.datasets[r.dataset]} · ${gl(r.generator)}</b><br>shadow AUC raw ${fmt(r.raw_auc_mean)} → PSyGenTAB ${fmt(r.psygentab_auc_mean)}<br>advantage change ${fmt(adv(r.raw_auc_mean)-adv(r.psygentab_auc_mean))} (positive = less leakage)`);
+    el.onmouseleave=hideTip;el.onclick=()=>{tapasGen=el.dataset.g;renderTapas();};});
+  const imp=rows.filter(r=>adv(r.raw_auc_mean)-adv(r.psygentab_auc_mean)>0.01).length,wor=rows.filter(r=>adv(r.psygentab_auc_mean)-adv(r.raw_auc_mean)>0.01).length;
+  $('#tapassum').innerHTML=`<span><b>${imp}</b>&nbsp;of ${rows.length} settings leak less</span><span><b>${rows.length-imp-wor}</b>&nbsp;unchanged (±0.01)</span><span><b>${wor}</b>&nbsp;leak more</span><span class="faint">(n/10) = datasets improved</span>`;
+}
+function renderTapas(){
+  renderTapasHeat();
+  const gens=TG.filter(g=>tapasRows().some(r=>r.generator===g));
+  $('#tapaschips').innerHTML=gens.map(g=>`<button data-g="${g}" class="${g===tapasGen?'on':''}">${gl(g)}</button>`).join('');
+  $('#tapaschips').querySelectorAll('button').forEach(b=>b.onclick=()=>{tapasGen=b.dataset.g;renderTapas();});
+  const svg=$('#tapas'),W=svg.clientWidth||900;const rows=tapasRows().filter(r=>r.generator===tapasGen);const H=Math.max(200,32*rows.length+60),m={l:150,r:30,t:14,b:46};svg.setAttribute('height',H);
+  const vals=tapasRows().flatMap(r=>[r.raw_auc_mean,r.psygentab_auc_mean]);
+  const[x0,x1]=niceExt(vals,0.5);const xs=scale(x0,x1,m.l,W-m.r),band=(H-m.t-m.b)/rows.length;
+  let g=grid(W,H,m,xs,null,ticks(x0,x1),null,`Shadow-model MIA AUC, ${gl(tapasGen)} (0.5 = attacker learns nothing)`,null);
+  g+=`<line x1="${xs(0.5)}" x2="${xs(0.5)}" y1="${m.t}" y2="${H-m.b}" stroke="${css('--ref')}" stroke-dasharray="4 3"/>`;
+  rows.forEach((r,i)=>{const y=m.t+band*(i+0.5);g+=`<text x="${m.l-10}" y="${y+4}" text-anchor="end">${D.datasets[r.dataset]}</text>`;
+    const a=xs(r.raw_auc_mean),b=xs(r.psygentab_auc_mean),good=adv(r.psygentab_auc_mean)<adv(r.raw_auc_mean)-0.01,bad=adv(r.psygentab_auc_mean)>adv(r.raw_auc_mean)+0.01;
+    g+=`<line x1="${a}" x2="${b}" y1="${y}" y2="${y}" stroke="${good?css('--s3'):bad?css('--s2'):css('--grid')}" stroke-opacity="${good||bad?0.45:1}" stroke-width="4" stroke-linecap="round"/>`;
+    g+=`<g class="tp" data-i="${i}">${marker('circle',a,y,5.5,css('--s3'))}${marker('diamond',b,y,5.5,css('--s1'))}<rect x="${Math.min(a,b)-12}" y="${y-10}" width="${Math.abs(b-a)+24}" height="20" fill="transparent"/></g>`;});
+  svg.innerHTML=g;svg.querySelectorAll('.tp').forEach(el=>{const r=rows[+el.dataset.i];el.onmousemove=e=>showTip(e,`<b>${D.datasets[r.dataset]} · ${gl(r.generator)}</b><br>raw ${fmt(r.raw_auc_mean)} → PSyGenTAB ${fmt(r.psygentab_auc_mean)}<br><span class="r">${r.n_targets} targets · ${r.n_shadow} shadow + ${r.n_eval} eval worlds · m=${r.m}</span>`);el.onmouseleave=hideTip;});
+  $('#leg4').innerHTML=`<span><svg width="14" height="14">${marker('circle',7,7,5,css('--s3'))}</svg>Raw generator</span><span><svg width="14" height="14">${marker('diamond',7,7,5,css('--s1'))}</svg>+ PSyGenTAB (ALM)</span><span class="faint">bar colour: green = less leakage, orange = more</span>`;
+}
+
+/* ---------------- strengths & limits ---------------- */
+function renderVerdict(){
+  const N=D.nums||{},n=k=>N[k]??'—';
+  const T=tapasRows(),byG=g=>{const rr=T.filter(r=>r.generator===g);return rr.length?[rr.reduce((a,r)=>a+adv(r.raw_auc_mean),0)/rr.length,rr.reduce((a,r)=>a+adv(r.psygentab_auc_mean),0)/rr.length,rr.filter(r=>adv(r.raw_auc_mean)-adv(r.psygentab_auc_mean)>0.01).length,rr.length]:[NaN,NaN,0,0];};
+  const [dr,dp,db,dn]=byG('tabddpm'),[br,bp,bb,bn]=byG('bayesian_network'),[ar,ap,ab,an]=byG('arf');
+  const card=(c,h,big,p,why)=>`<div class="vcard" style="--c:var(${c})"><h4>${h}</h4>${big?`<div class="big">${big}</div>`:''}<p>${p}</p>${why?`<div class="why">${why}</div>`:''}</div>`;
+  $('#shines').innerHTML=[
+    card('--s3','Removes most distance-attack leakage',`${n('numPooledDistReduction')}% of it`,`Pooled over the seven generators, PSyGenTAB removes ${n('numPooledDistReduction')}% of the distance-attack advantage and ${n('numPooledDomiasReduction')}% of the DOMIAS density-attack advantage, without retraining anything.`),
+    card('--s3','Largest gains where the risk is real',`shadow attack ${dr.toFixed(2)} → ${dp.toFixed(2)}`,`On the generators that copy training patients most, the strongest attacker loses about half of their advantage. TabDDPM: ${dr.toFixed(3)} → ${dp.toFixed(3)}, better on ${db}/${dn} datasets. BayesNet: ${br.toFixed(3)} → ${bp.toFixed(3)}, better on ${bb}/${bn}. BayesNet's DOMIAS AUC drops from ${n('numBnRawDomias')} to ${n('numBnPsyDomias')} (paired change ${n('numBnDiffDomias')} ${n('numBnDiffDomiasCI')}).`),
+    card('--s3','Best overall trade-off of all methods',`#1 of ${n('numNMethods')}`,`REaLTabFormer + PSyGenTAB has the best average utility-and-privacy rank, ${n('numRtfPsyRankCI')}. Its downstream AUROC is ${n('numRtfRawAuroc')} → ${n('numRtfPsyAuroc')}, and its DOMIAS leakage falls by ${n('numRtfDiffDomias')} ${n('numRtfDiffDomiasCI')}.`),
+    card('--s3','Keeps the data useful, unlike DP at these sizes',`AUROC ${n('numRtfPsyAuroc')} vs ${n('numPateOneAuroc')}`,`Real-data models reach AUROC ${n('numTrtrAuroc')}. At ε = 1, PATE-GAN reaches ${n('numPateOneAuroc')}, and both DP-CTAB-GAN+ variants sit at chance (≈0.50) at every ε. PSyGenTAB keeps synthetic data at the level of non-private generators.`),
+    card('--s3','Exact, cheap and reusable',`ALM = oracle in ${n('numAblAlmEqOracle')}% of runs`,`The augmented Lagrangian always finds the best feasible candidate. Because only sampling changes, one trained model can serve a lenient floor for an internal team and a strict one for an external partner.`)].join('');
+  $('#falls').innerHTML=[
+    card('--s2','The privacy floor is less reliable on the smallest cohorts',`${n('numAblAlmFeasVal')}% on calibration → ${n('numAblAlmFeasTest')}% on test`,`PSyGenTAB meets P ≥ 0.90 on the calibration split it optimises on in ${n('numAblAlmFeasVal')}% of runs, and on the untouched test split in ${n('numAblAlmFeasTest')}%. On every dataset with at least 420 calibration patients it holds in ≥ 91% of runs. On Parkinson's, with only 39 calibration patients, it holds in 58%.`,
+      `<b>Why:</b> with a few dozen calibration records the privacy score is a noisy estimate. The optimiser picks the most useful candidate that clears the floor, so it tends to pick candidates just above it, and some of these fall back below on new data (the "winner's curse"). Requesting a higher floor barely helps, because the limit is the noise, not the floor. <b>Mitigation:</b> reserve a larger calibration split for small cohorts.`),
+    card('--s2','The strongest attack is not always reduced',`leaks more in ${n('numTapasWorse')} of ${n('numTapasTotal')} settings`,`Against the shadow-model attack, PSyGenTAB helps in ${n('numTapasImproved')} settings, makes no difference in ${n('numTapasSame')} and leaks more in ${n('numTapasWorse')}. ARF is the clear negative case (${ar.toFixed(3)} → ${ap.toFixed(3)}, better on only ${ab}/${an}).`,
+      `<b>Why:</b> PSyGenTAB's score measures one thing, how close synthetic records sit to real patients. ARF's leakage is attackable but not proximity-based: membership shifts the forest's leaf densities rather than producing near-copies, so the score cannot see it. For CTGAN, whose raw output is already near chance, the selection only reshuffles AUCs around 0.5. Each setting has only 20 evaluation worlds, so its interval is wide.`),
+    card('--s2','Little effect on generators that already behave well','',`For CTGAN, TVAE and CTAB-GAN+, the paired changes in attack AUC have intervals that include zero.`,
+      `<b>Why:</b> this is by design. PSyGenTAB is a constraint, not a regulariser: if the raw output already clears the floor there is little to remove, and it does not add protection beyond the generator's own.`),
+    card('--s2','Utility gain is not statistically supported',`${n('numRtfDiffAuroc')} ${n('numRtfDiffAurocCI')}`,`REaLTabFormer's AUROC rises on average with PSyGenTAB, but the interval includes zero.`,
+      `<b>Why:</b> part of the gain comes from tuning the sampling temperature on calibration data. The effect varies a lot across ten heterogeneous datasets, so we claim "no loss of utility", not a gain.`),
+    card('--s2','A small fairness cost for the most-filtered generator',`parity ${n('numBnDiffParity')} ${n('numBnDiffParityCI')}`,`BayesNet's representation parity falls from ${n('numBnRawParity')} to ${n('numBnPsyParity')}. Worst-subgroup utility and rare-category coverage are preserved.`,
+      `<b>Why:</b> small subgroups have few training patients, so their synthetic records are more often near-copies of one of them and are filtered more. Per-subgroup acceptance limits are a natural extension.`),
+    card('--s2','Empirical protection, not a formal guarantee','',`PSyGenTAB is audited by attacks, not bounded by a differential-privacy parameter. Our DP baselines are also weak at these sizes: only ${n('numDpValidRate')}% of DP-CTAB-GAN+ rows fall inside the training ranges.`,
+      `<b>Why it matters:</b> an adaptive attacker who knows the selection rule could exploit the acceptance decision itself, so releases should be issued once per recipient and logged. Where a formal guarantee is required, DP remains the right tool.`)].join('');
+}
+/* ---------------- tables ---------------- */
+let sortKey='rank_overall',sortAsc=true;
+function renderBoard(){
+  const cols=[['label','Method'],['rank_overall','Overall'],['rank_utility','Utility'],['rank_privacy','Privacy'],['rank_fairness','Fairness'],['tstr_catboost_auroc','TSTR AUROC'],['alpha_precision','α-prec.'],['c2st_auc','C2ST AUC'],['P','P'],['mia_domias_auc','DOMIAS'],['mia_dist_auc','Dist. MIA'],['aia_risk','AIA risk'],['repr_parity','Repr. parity'],['subgroup_util_ratio_min','Worst-subgr.'],['js_mean','Mean JS'],['n_datasets','Datasets']].filter(([k])=>k==='label'||k==='n_datasets'||k.startsWith('rank')||D.metrics[k]);
+  const rows=[...D.board].sort((a,b)=>{const x=a[sortKey],y=b[sortKey];return(typeof x==='string'?x.localeCompare(y):((x??1e9)-(y??1e9)))*(sortAsc?1:-1);});
+  $('#board').innerHTML='<thead><tr>'+cols.map(([k,l])=>`<th data-k="${k}">${l}${k===sortKey?(sortAsc?' ▲':' ▼'):''}</th>`).join('')+'</tr></thead><tbody>'+
+    rows.map(r=>`<tr class="${r.family.startsWith('psygentab')?'ours':''}">`+cols.map(([k])=>`<td>${k==='label'?r.label:k==='n_datasets'?r[k]:fmt(r[k],k.startsWith('rank')?2:3)}</td>`).join('')+'</tr>').join('')+
+    D.pending.map(p=>`<tr><td>${p}</td><td colspan="${cols.length-1}" class="faint" style="text-align:left">pending (GPU run)</td></tr>`).join('')+'</tbody>';
+  $('#board').querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;sortAsc=k===sortKey?!sortAsc:true;sortKey=k;renderBoard();});
+}
+const SLAB={P:'Privacy score P',mia_domias_auc:'DOMIAS AUC',mia_dist_auc:'Distance-MIA AUC',tstr_catboost_auroc:'TSTR AUROC',repr_parity:'Representation parity',subgroup_util_ratio_min:'Worst-subgroup utility'};
+opt($('#ssel'),Object.keys(SLAB).filter(k=>D.stats.some(s=>s.metric===k)).map(k=>[k,SLAB[k]]),'mia_domias_auc');$('#ssel').onchange=renderStats;
+function stars(p){return p<0.001?'***':p<0.01?'**':p<0.05?'*':'n.s.';}
+function renderStats(){const k=$('#ssel').value;const rows=D.stats.filter(s=>s.metric===k);
+  $('#stats').innerHTML='<thead><tr><th>Comparison</th><th>Datasets</th><th>Δ (better)</th><th>Wins / losses</th><th>Rank-biserial</th><th>p</th><th>p (Holm)</th><th></th></tr></thead><tbody>'+
+    rows.map(r=>`<tr class="ours"><td>${D.methods[r.reference]?D.methods[r.reference].label:r.reference} vs. raw</td><td>${r.n}</td><td>${(r.mean_diff>=0?'+':'')+fmt(r.mean_diff,4)}</td><td>${r.wins} / ${r.losses}</td><td>${fmt(r.rank_biserial,2)}</td><td>${fmt(r.p,4)}</td><td>${fmt(r.p_holm,4)}</td><td class="sig">${stars(r.p_holm)}</td></tr>`).join('')+'</tbody>';}
+function renderDatasets(){$('#dtable').innerHTML='<thead><tr><th>Dataset</th><th>Domain</th><th>N</th><th>Cont.</th><th>Cat.</th><th>Classes</th><th>Minority</th></tr></thead><tbody>'+
+  D.datasets_table.map(r=>`<tr><td>${r.label}</td><td>${r.domain}</td><td>${r.N.toLocaleString()}</td><td>${r.cont}</td><td>${r.cat}</td><td>${r.classes}</td><td>${(100*r.minority).toFixed(1)}%</td></tr>`).join('')+'</tbody>';
+  $('#prog').innerHTML=D.progress.map(p=>`<span>${gl(p.generator.replace(/_eps\d+$/,''))}${/_eps/.test(p.generator)?' ε='+p.generator.split('_eps')[1]:''}</span><div class="b"><i style="width:${Math.min(100,100*p.done/p.planned)}%"></i></div><span class="faint">${p.done}/${p.planned}</span>`).join('');}
+function renderGallery(){$('#gallery').innerHTML=D.figures.map(f=>`<figure data-src="assets/${f.name}.png"><img loading="lazy" src="assets/${f.name}.png" alt="${f.caption}"><figcaption>${f.caption}</figcaption></figure>`).join('');
+  $('#gallery').querySelectorAll('figure').forEach(fg=>fg.onclick=()=>{const lb=$('#lb');lb.querySelector('img').src=fg.dataset.src;lb.style.display='flex';});$('#lb').onclick=()=>$('#lb').style.display='none';}
+
+/* ---------------- boot ---------------- */
+$('#built').textContent=D.built;
+$('#copybib').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText($('#bib').textContent);$('#copybib').textContent='Copied ✓';};
+function renderCharts(){renderDial();renderScatter();renderDots();renderFair();renderTapas();renderVerdict();}
+const saved=localStorage.getItem('psy-theme');if(saved)document.documentElement.dataset.theme=saved;
+$('#theme').onclick=()=>{const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';localStorage.setItem('psy-theme',r.dataset.theme);renderCharts();};
+renderHero();renderCharts();renderBoard();renderStats();renderDatasets();renderGallery();
+let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(renderCharts,120);});
+</script>
+</body>
+</html>

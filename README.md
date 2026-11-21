@@ -1,206 +1,105 @@
 # PSyGenTAB
 
-### Privacy-Preserving Synthetic Tabular Data Generation via Constrained Optimization
+### Privacy-Constrained Synthetic Health Data Generation at Sampling Time
 
-PSyGenTAB is a **model-agnostic framework** for generating synthetic tabular data with **explicit and controllable privacy–utility trade-offs**.
+**Website and interactive results:** https://arshiailaty.github.io/PsyGenTAB/
 
-The framework formulates synthetic data generation as a **constrained optimization problem** and enforces privacy using the **Augmented Lagrangian Method (ALM)**. It integrates multi-dimensional utility and privacy metrics and works with both transformer-based and GAN-based tabular generators.
+PSyGenTAB turns the privacy of a synthetic-data release into a floor that the data custodian sets, $P \geq P_{\min}$. It enforces that floor at **sampling time**, for any already-trained tabular generator and without retraining.
 
----
+How it works:
 
-## 🚀 Features
+1. From the trained generator, PSyGenTAB draws candidate releases. A candidate is a sampling configuration (for example, a temperature) plus a record-acceptance threshold.
+2. Every candidate is scored for utility $U$ and privacy $P$ on a calibration holdout that the generator never saw.
+3. The release is the most useful candidate that meets the floor. This choice is solved exactly with an augmented Lagrangian.
 
-* Constrained optimization formulation for synthetic data generation
-* Explicit privacy threshold enforcement
-* Composite utility and privacy metrics
-* Sampling-time ALM optimization
-* Compatible with:
+Every reported number is recomputed on a separate, untouched test split, and every release is checked with five attack families.
 
-  * REaLTabFormer (Transformer-based)
-  * CTAB-GAN+ (GAN-based)
-* Model-agnostic design (no architectural modification required)
+This repository contains the full study pipeline:
 
----
+- seven generators plus differentially private (DP) baselines
+- ten datasets
+- 1,600 runs and 3,250 evaluated releases
+- the attacks, ablations and statistics
+- the code that builds the paper's tables and the website
 
-## 📂 Repository Structure
-
-```
-.
-├── README.md
-├── RTF+ALM.ipynb                    # REaLTabFormer + ALM (training + generation)
-├── CTAB GAN+ ALM.ipynb              # CTAB-GAN+ + ALM (training + generation)
-├── eval/                            # Evaluation scripts (privacy, utility, fidelity)
-│   ├── evaluate_all.py              # Main entrypoint to reproduce paper evaluations
-│   ├── commercial_tools_scores.py   # Evaluation of commercial synthetic data tools
-│   ├── statistical_fidelity_analysis.py
-│   ├── ml_utility_evaluation.py
-│   └── adverserial_attacks.py
-└── data/
-    └── CTAB-GAN-Plus-outputs/       # Example synthetic outputs from CTAB-GAN+ (CSV)
-```
-
-The evaluation scripts expect an `ALM_Paper/` folder under `eval/` containing the **original** and **synthetic** CSVs for all datasets used in the paper (e.g. `diabetes_health_indicators_original.csv`, `*_synthetic_alm.csv`, `*_synthetic_rtf.csv`, etc.).
-If you are a reviewer, this folder is provided as part of the **supplementary material / data archive**; after downloading it, place it at:
-
-```
-PsyGenTAB/eval/ALM_Paper/
-```
+> The original notebooks (`RTF+ALM.ipynb`, `eval/`) are kept for reference. The study code is the `psygentab/` package together with `scripts/`.
 
 ---
 
-## 🧠 Method Overview
-
-We optimize the following constrained objective:
+## Repository structure
 
 ```
-L = Q − λ * max(0, P_min − P) − (μ/2) * (P_min − P)^2
+psygentab/              library
+  datasets.py           dataset registry, cleaning, 60/20/20 split contract
+  encoding.py           shared numeric encoding for every distance-based metric
+  generators.py         uniform fit/sample interface: REaLTabFormer, CTAB-GAN+, synthcity zoo
+  ctabgan_dp.py         DP-SGD CTAB-GAN+ (weight-clipping and gradient-penalty critics, RDP accounting)
+  core.py               candidate scoring, PSyGenTAB selectors (ALM, minimal intervention, baselines)
+  metrics.py            utility, fidelity, privacy, attacks, fairness and diversity metrics
+  evaluate.py           full evaluation of one released dataset on the test split
+scripts/
+  run_one.py, run_all.py     one run / the whole grid (CPU and GPU lanes)
+  tapas_attack.py            shadow-model membership inference (TAPAS-style)
+  ablations.py               P_min sweep, ALM vs. penalty/oracle, outer iterations, weights
+  aggregate.py, leaderboard.py, ci.py   tables, ranks, Friedman/Nemenyi, Wilcoxon+Holm, 95% CIs
+  figures.py, paper_tables.py, supplement.py   paper figures, tables and supplementary material
+  build_site.py, site_template.html            the project website
+  rescore_holdout_size.py    recomputes test-side proximity metrics after the equal-reference-size fix
+third_party/CTAB-GAN-Plus    official CTAB-GAN+ (git submodule, unmodified)
+RUN_STUDY.md                 how to reproduce the study (local CPU lane + AWS GPU lane)
+requirements-study.txt       pinned environment
 ```
 
-Where:
-
-* `Q` = composite utility score
-* `P` = privacy score
-* `P_min` = required privacy threshold
-* `λ, μ` = adaptive ALM multipliers
-
-ALM outer iterations progressively enforce privacy constraints while preserving data fidelity.
-
----
-
-## 📊 Datasets Used
-
-Experiments were conducted on:
-
-* Adult Census Income
-* Breast Cancer Wisconsin (Diagnostic)
-* Diabetes Health Indicators
-* PIR Vision Office
-* Vietnam Banking Transactions
-
-
-
----
-
-## ⚙️ Environment Setup
-
-**Recommended Python version:** 3.9–3.11
-
-All core dependencies for the evaluation scripts and notebooks are listed in `requirements.txt`.
-
-1. **Create and activate a virtual environment**
-   - On macOS / Linux:
-     ```bash
-     python3 -m venv .venv
-     source .venv/bin/activate
-     ```
-   - On Windows (PowerShell):
-     ```powershell
-     python -m venv .venv
-     .venv\Scripts\Activate.ps1
-     ```
-
-2. **Install dependencies**
-   ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
-
-3. (Optional, for GPU) Install a CUDA-enabled build of PyTorch following the instructions from the official PyTorch documentation.
-
-
-## ▶️ Reproducing Evaluation Results (Command Line)
-
-The main entrypoint to reproduce the paper’s evaluation tables and figures is `eval/evaluate_all.py`.
-
-From the repository root:
+## Setup
 
 ```bash
+git clone --recurse-submodules https://github.com/ArshiaIlaty/PsyGenTAB.git
 cd PsyGenTAB
-python -m venv .venv
-source .venv/bin/activate          # or .venv\Scripts\Activate.ps1 on Windows
-pip install -r requirements.txt
-
-# Ensure ALM_Paper/ with original + synthetic CSVs is present:
-# PsyGenTAB/eval/ALM_Paper/...
-
-python eval/evaluate_all.py
+conda create -n psygentab python=3.10 -y && conda activate psygentab
+pip install -r requirements-study.txt
 ```
 
-By default, this:
+## Data
 
-- Evaluates **11 datasets** (e.g. `diabetes_health_indicators`, `adult_census_income`, `breast_cancer`, `vn_banking`, `lung_cancer`, `obesity`, `hypothyroid`, `liver_disorders`, `heart_failure_clinical_records`, `pir_vision_office`).
-- Compares **ALM** vs **RTF** synthetic data.
-- Writes per-dataset JSON reports and an aggregated `evaluation_summary.json` under:
+The datasets are public and are not redistributed here. Place each one as `data/raw/<name>.csv`, or point the `PSY_DATA` environment variable at another folder. The expected names and target columns are:
 
-```
-eval/ALM_Paper/evaluation_reports/
-```
+| name | target | domain |
+|---|---|---|
+| `breast_cancer` (WDBC, 569 rows) | `diagnosis` | clinical |
+| `diabetes` | `Diabetes_012` | health survey |
+| `heart_failure` | `DEATH_EVENT` | clinical |
+| `hypothyroid` | `binaryClass` | clinical |
+| `liver_disorders` | `drinks > 3` (derived; `selector` is dropped) | clinical |
+| `obesity` | `NObeyesdad` | health survey |
+| `parkinsons` | `status` | clinical |
+| `adult` | `Target` | demographics |
+| `pir_vision` | `Target` | sensor |
+| `vn_banking` | `is_churned` | financial |
 
-### Optional components and external tools
+Cleaning, column types and the 60/20/20 train / calibration / test split (5 splits) are defined in `psygentab/datasets.py`.
 
-Some evaluation components depend on external libraries that may be slow or licensed differently:
+## Reproducing the study
 
-- **SDMetrics reports** (via `sdmetrics` / `sdv`)
-- **MostlyAI QA reports** (via `mostlyai`)
-- **Privacy attack framework** (via `privacy_evaluation_framework`, if available)
-
-You can:
-
-- **Disable specific components**:
-  ```bash
-  python eval/evaluate_all.py --skip-components privacy_attacks sdmetrics mostlyai_qa
-  ```
-- **Run only a subset of datasets**:
-  ```bash
-  python eval/evaluate_all.py --datasets diabetes_health_indicators adult_census_income
-  ```
-
-
-## ▶️ Running Experiments from Notebooks
-
-The two main notebooks are:
-
-- `RTF+ALM.ipynb`
-- `CTAB GAN+ ALM.ipynb`
-
-Each notebook:
-
-- Trains the underlying generator (REaLTabFormer or CTAB-GAN+).
-- Generates synthetic datasets at different privacy–utility operating points.
-- Saves synthetic CSVs expected by the evaluation scripts.
-
-These notebooks may require **additional, model-specific dependencies** (e.g. REaLTabFormer and CTAB-GAN+ packages).
-We recommend using the same virtual environment as above, and installing any extra packages indicated at the top of each notebook.
-
-To run a notebook:
+See [RUN_STUDY.md](RUN_STUDY.md). In short:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-pip install jupyter
-jupyter notebook
+python -m scripts.run_all --lane cpu      # BayesNet, ARF, TVAE, CTGAN, TabDDPM, PATE-GAN
+python -m scripts.run_all --lane gpu      # REaLTabFormer, CTAB-GAN+, DP-CTAB-GAN+ (both variants)
+python -m scripts.tapas_attack --dataset heart_failure --generator rtf
+python -m scripts.ablations && python -m scripts.aggregate && python -m scripts.figures
+python -m scripts.build_site              # website -> site/
 ```
 
-Then open the desired notebook and execute all cells.
+Runs are resumable: finished runs leave a `DONE` marker and are skipped.
 
----
+## Citation
 
-## 🔐 Privacy Note
-
-This framework reduces memorization and re-identification risk through constrained optimization.
-It does **not** provide formal differential privacy guarantees unless explicitly integrated with DP mechanisms.
-
----
-
-## 📄 Citation
-
-If you use this repository in academic work, please cite the associated paper (citation details will be added upon publication).
-
----
-
-## 📬 Support
-
-For questions, reproducibility issues, or suggestions, please open an issue in this repository.
-
-
+```bibtex
+@article{ilaty2026psygentab,
+  title   = {PSyGenTAB: Privacy-Constrained Synthetic Health Data Generation at Sampling Time},
+  author  = {Ilaty, Arshia and Shirazi, Hossein and Chitale, Manasi and Hegde, Kedar and Ramesh, Dhanalakshmi
+             and Manjunath, Rashmi S. and Rahmani, Amir M. and Homayouni, Hajar},
+  journal = {under review},
+  year    = {2026}
+}
+```
