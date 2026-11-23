@@ -409,7 +409,7 @@ function renderHero(){
   const rawEx=pairs.reduce((a,g)=>a+ex(g,''),0),psyEx=pairs.reduce((a,g)=>a+ex(g,'+psygentab'),0);
   const rel=rawEx>0?Math.round(100*(rawEx-psyEx)/rawEx):NaN;
   $('#tiles').innerHTML=[
-    ['Released datasets evaluated',D.n_runs.toLocaleString(),`${D.board.length} methods · 10 datasets`],
+    ['Released datasets evaluated',(D.nums&&D.nums.numNReleases)||D.n_runs.toLocaleString(),`${D.board.length} methods · 10 datasets`],
     ['Distance-attack leakage removed',isNaN(rel)?'—':rel+'%',`pooled excess AUC, ${pairs.length} generators`],
     ['DOMIAS leakage removed',fmt(dDom,3),'reduction of |AUC − 0.5|'],
     ['Utility change',(dU>=0?'+':'')+fmt(dU,3),'TSTR AUROC, PSyGenTAB − raw']].map(([k,v,d])=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join('');
